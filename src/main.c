@@ -24,6 +24,7 @@ SOFTWARE.
 #include <stdlib.h>
 
 #include "pd_api.h"
+#include "geometry.h"
 
 static int update(void* userdata);
 
