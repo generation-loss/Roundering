@@ -1,0 +1,5 @@
+name=Roundering
+author=Russell Warneboldt
+description=A 3D rendering engine for Playdate
+bundleID=com.generation-loss.roundering
+imagePath=
