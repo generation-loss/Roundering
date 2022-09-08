@@ -27,9 +27,16 @@ SOFTWARE.
 
 typedef struct triangle
 {
-	float3 x;
-	float3 y;
-	float3 z;
+	union
+	{
+		struct
+		{
+			float3 a;
+			float3 b;
+			float3 c;
+		};
+		float3 vertices[3];
+	};
 } triangle;
 
 typedef struct mesh
