@@ -32,7 +32,12 @@ typedef struct float3
 	float z;
 } float3;
 
+float3 float3_add(float3 a, float3 b);
+float3 float3_add_scalar(float3 a, float b);
 float3 float3_subtract(float3 a, float3 b);
+float3 float3_subtract_scalar(float3 a, float b);
+float3 float3_multiply_scalar(float3 a, float b);
+float3 float3_divide_scalar(float3 a, float b);
 float float3_dot(float3 a, float3 b);
 float float3_length(float3 v);
 float3 float3_normalize(float3 unnormalized);
@@ -45,6 +50,13 @@ typedef struct float4
 	float z;
 	float w;
 } float4;
+
+float4 float4_add(float4 a, float4 b);
+float4 float4_add_scalar(float4 a, float b);
+float4 float4_subtract(float4 a, float4 b);
+float4 float4_subtract_scalar(float4 a, float b);
+float4 float4_multiply_scalar(float4 a, float b);
+float4 float4_divide_scalar(float4 a, float b);
 
 typedef struct float4x4
 {
@@ -74,6 +86,11 @@ typedef struct float4x4
     };
 } float4x4;
 
+float4 float4x4_multiply_float4(float4x4 a, float4 b);
+float4x4 float4x4_multiply_float4x4(float4x4 a, float4x4 b);
+
+int clamp(int val, int min, int max);
+
 typedef struct camera
 {
 	float4x4 view;
@@ -81,7 +98,8 @@ typedef struct camera
 	float4x4 viewProject;
 } camera;
 
-void Perspective(camera *camera, const float fovy, const float aspect, const float near, const float far);
-void LookAt(camera *camera, const float3 eye, const float3 center, const float3 up);
+void camera_perspective(camera *camera, const float fovy, const float aspect, const float near, const float far);
+void camera_look_at(camera *camera, const float3 eye, const float3 center, const float3 up);
+void camera_update_view_project(camera *camera);
 
 #endif /* __ROUNDERING_MATH_H__ */
