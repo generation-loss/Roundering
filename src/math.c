@@ -150,6 +150,11 @@ float4 float4_divide_scalar(float4 a, float b)
 	return result;
 }
 
+float float4_dot(float4 a, float4 b)
+{
+	return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+}
+
 // float4x4
 
 float4 float4x4_multiply_float4(float4x4 a, float4 b)
@@ -213,12 +218,12 @@ void camera_perspective(camera *camera, const float fovy, const float aspect, co
 	float xScale = yScale / aspect;
 	float zScale = far / (far - near);
 	
-	camera->view.m00 = xScale;
-	camera->view.m11 = yScale;
-	camera->view.m22 = zScale;
-	camera->view.m23 = 1.0f;
-	camera->view.m32 = -near * zScale; //same as near * far / (near - far), just multiplied top and bottom by -1
-	camera->view.m33 = 0.0f;
+	camera->project.m00 = xScale;
+	camera->project.m11 = yScale;
+	camera->project.m22 = zScale;
+	camera->project.m23 = 1.0f;
+	camera->project.m32 = -near * zScale; //same as near * far / (near - far), just multiplied top and bottom by -1
+	camera->project.m33 = 0.0f;
 }
 
 void camera_look_at(camera *camera, const float3 eye, const float3 center, const float3 up)
@@ -227,21 +232,21 @@ void camera_look_at(camera *camera, const float3 eye, const float3 center, const
 	float3 xAxis = float3_normalize(float3_cross(up, zAxis));
 	float3 yAxis = float3_cross(zAxis, xAxis);
 	
-	camera->project.m00 = xAxis.x;
-	camera->project.m10 = xAxis.y;
-	camera->project.m20 = xAxis.z;
+	camera->view.m00 = xAxis.x;
+	camera->view.m10 = xAxis.y;
+	camera->view.m20 = xAxis.z;
 	
-	camera->project.m01 = yAxis.x;
-	camera->project.m11 = yAxis.y;
-	camera->project.m21 = yAxis.z;
+	camera->view.m01 = yAxis.x;
+	camera->view.m11 = yAxis.y;
+	camera->view.m21 = yAxis.z;
 	
-	camera->project.m02 = zAxis.x;
-	camera->project.m12 = zAxis.y;
-	camera->project.m22 = zAxis.z;
+	camera->view.m02 = zAxis.x;
+	camera->view.m12 = zAxis.y;
+	camera->view.m22 = zAxis.z;
 	
-	camera->project.m30 = -float3_dot(xAxis, eye);
-	camera->project.m31 = -float3_dot(yAxis, eye);
-	camera->project.m32 = -float3_dot(zAxis, eye);
+	camera->view.m30 = -float3_dot(xAxis, eye);
+	camera->view.m31 = -float3_dot(yAxis, eye);
+	camera->view.m32 = -float3_dot(zAxis, eye);
 }
 
 void camera_update_view_project(camera *camera)

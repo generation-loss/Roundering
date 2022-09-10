@@ -38,8 +38,8 @@ float3 float3_subtract(float3 a, float3 b);
 float3 float3_subtract_scalar(float3 a, float b);
 float3 float3_multiply_scalar(float3 a, float b);
 float3 float3_divide_scalar(float3 a, float b);
-float float3_dot(float3 a, float3 b);
-float float3_length(float3 v);
+float  float3_dot(float3 a, float3 b);
+float  float3_length(float3 v);
 float3 float3_normalize(float3 unnormalized);
 float3 float3_cross(float3 a, float3 b);
 
@@ -57,6 +57,7 @@ float4 float4_subtract(float4 a, float4 b);
 float4 float4_subtract_scalar(float4 a, float b);
 float4 float4_multiply_scalar(float4 a, float b);
 float4 float4_divide_scalar(float4 a, float b);
+float  float4_dot(float4 a, float4 b);
 
 typedef struct float4x4
 {
