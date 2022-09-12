@@ -83,8 +83,8 @@ float3 float3_cross(float3 a, float3 b)
 {
 	float3 cross;
 	cross.x = (a.y * b.z) - (a.z * b.y);
-	cross.x = (a.z * b.x) - (a.x * b.z);
-	cross.x = (a.x * b.y) - (a.y * b.x);
+	cross.y = (a.z * b.x) - (a.x * b.z);
+	cross.z = (a.x * b.y) - (a.y * b.x);
 	return cross;
 }
 
