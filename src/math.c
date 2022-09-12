@@ -7,6 +7,126 @@
 
 #include "math.h"
 
+// int2
+
+int2 int2_add(int2 a, int2 b)
+{
+	int2 result;
+	result.x = a.x + b.x;
+	result.y = a.y + b.y;
+	return result;
+}
+
+int2 int2_add_scalar(int2 a, float b)
+{
+	int2 result;
+	result.x = a.x + b;
+	result.y = a.y + b;
+	return result;
+}
+
+int2 int2_subtract(int2 a, int2 b)
+{
+	int2 result;
+	result.x = a.x - b.x;
+	result.y = a.y - b.y;
+	return result;
+}
+
+int2 int2_subtract_scalar(int2 a, float b)
+{
+	int2 result;
+	result.x = a.x - b;
+	result.y = a.y - b;
+	return result;
+}
+
+int2 int2_multiply_scalar(int2 a, float b)
+{
+	int2 result;
+	result.x = a.x * b;
+	result.y = a.y * b;
+	return result;
+}
+
+int2 int2_divide_scalar(int2 a, float b)
+{
+	int2 result;
+	result.x = a.x / b;
+	result.y = a.y / b;
+	return result;
+}
+
+float int2_dot(int2 a, int2 b)
+{
+	return (a.x * b.x) + (a.y * b.y);
+}
+
+float int2_length(int2 v)
+{
+	return sqrtf(int2_dot(v, v));
+}
+
+// float2
+
+float2 float2_add(float2 a, float2 b)
+{
+	float2 result;
+	result.x = a.x + b.x;
+	result.y = a.y + b.y;
+	return result;
+}
+
+float2 float2_add_scalar(float2 a, float b)
+{
+	float2 result;
+	result.x = a.x + b;
+	result.y = a.y + b;
+	return result;
+}
+
+float2 float2_subtract(float2 a, float2 b)
+{
+	float2 result;
+	result.x = a.x - b.x;
+	result.y = a.y - b.y;
+	return result;
+}
+
+float2 float2_subtract_scalar(float2 a, float b)
+{
+	float2 result;
+	result.x = a.x - b;
+	result.y = a.y - b;
+	return result;
+}
+
+float2 float2_multiply_scalar(float2 a, float b)
+{
+	float2 result;
+	result.x = a.x * b;
+	result.y = a.y * b;
+	return result;
+}
+
+float2 float2_divide_scalar(float2 a, float b)
+{
+	float2 result;
+	result.x = a.x / b;
+	result.y = a.y / b;
+	return result;
+}
+
+float float2_dot(float2 a, float2 b)
+{
+	return (a.x * b.x) + (a.y * b.y);
+}
+
+float float2_length(float2 v)
+{
+	return sqrtf(float2_dot(v, v));
+}
+
 // float3
 
 float3 float3_add(float3 a, float3 b)
@@ -88,6 +208,14 @@ float3 float3_cross(float3 a, float3 b)
 	return cross;
 }
 
+float2 float3_xy(float3 v)
+{
+	float2 result;
+	result.x = v.x;
+	result.y = v.y;
+	return result;
+}
+
 // float4
 
 float4 float4_add(float4 a, float4 b)
@@ -155,6 +283,15 @@ float float4_dot(float4 a, float4 b)
 	return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
 }
 
+float3 float4_xyz(float4 v)
+{
+	float3 result;
+	result.x = v.x;
+	result.y = v.y;
+	result.z = v.z;
+	return result;
+}
+
 // float4x4
 
 float4 float4x4_multiply_float4(float4x4 a, float4 b)
@@ -196,17 +333,19 @@ float4x4 float4x4_multiply_float4x4(float4x4 a, float4x4 b)
 
 // misc
 
+int min(int a, int b)
+{
+	return a < b ? a : b;
+}
+
+int max(int a, int b)
+{
+	return a > b ? a : b;
+}
+
 int clamp(int val, int minVal, int maxVal)
 {
-	int result = val;
-	
-	if (result < minVal)
-		result = minVal;
-		
-	if (result > maxVal)
-		result = maxVal;
-		
-	return result;
+	return min(maxVal, max(minVal, val));
 }
 
 // camera
@@ -247,6 +386,8 @@ void camera_look_at(camera *camera, const float3 eye, const float3 center, const
 	camera->view.m30 = -float3_dot(xAxis, eye);
 	camera->view.m31 = -float3_dot(yAxis, eye);
 	camera->view.m32 = -float3_dot(zAxis, eye);
+	
+	camera->view.m33 = 1.0f;
 }
 
 void camera_update_view_project(camera *camera)

@@ -25,6 +25,36 @@ SOFTWARE.
 
 #include <math.h>
 
+typedef struct int2
+{
+	int x;
+	int y;
+} int2;
+
+int2 int2_add(int2 a, int2 b);
+int2 int2_add_scalar(int2 a, float b);
+int2 int2_subtract(int2 a, int2 b);
+int2 int2_subtract_scalar(int2 a, float b);
+int2 int2_multiply_scalar(int2 a, float b);
+int2 int2_divide_scalar(int2 a, float b);
+float  int2_dot(int2 a, int2 b);
+float  int2_length(int2 v);
+
+typedef struct float2
+{
+	float x;
+	float y;
+} float2;
+
+float2 float2_add(float2 a, float2 b);
+float2 float2_add_scalar(float2 a, float b);
+float2 float2_subtract(float2 a, float2 b);
+float2 float2_subtract_scalar(float2 a, float b);
+float2 float2_multiply_scalar(float2 a, float b);
+float2 float2_divide_scalar(float2 a, float b);
+float  float2_dot(float2 a, float2 b);
+float  float2_length(float2 v);
+
 typedef struct float3
 {
 	float x;
@@ -42,6 +72,7 @@ float  float3_dot(float3 a, float3 b);
 float  float3_length(float3 v);
 float3 float3_normalize(float3 unnormalized);
 float3 float3_cross(float3 a, float3 b);
+float2 float3_xy(float3 v);
 
 typedef struct float4
 {
@@ -58,6 +89,7 @@ float4 float4_subtract_scalar(float4 a, float b);
 float4 float4_multiply_scalar(float4 a, float b);
 float4 float4_divide_scalar(float4 a, float b);
 float  float4_dot(float4 a, float4 b);
+float3 float4_xyz(float4 v);
 
 typedef struct float4x4
 {
@@ -90,6 +122,8 @@ typedef struct float4x4
 float4 float4x4_multiply_float4(float4x4 a, float4 b);
 float4x4 float4x4_multiply_float4x4(float4x4 a, float4x4 b);
 
+int min(int a, int b);
+int max(int a, int b);
 int clamp(int val, int min, int max);
 
 typedef struct camera
