@@ -31,21 +31,21 @@ typedef struct triangle
 	{
 		struct
 		{
-			float3 v0;
-			float3 v1;
-			float3 v2;
+			fixedInt3 v0;
+			fixedInt3 v1;
+			fixedInt3 v2;
 		};
-		float3 vertices[3];
+		fixedInt3 vertices[3];
 	};
 	union
 	{
 		struct
 		{
-			float3 n0;
-			float3 n1;
-			float3 n2;
+			fixedInt3 n0;
+			fixedInt3 n1;
+			fixedInt3 n2;
 		};
-		float3 normals[3];
+		fixedInt3 normals[3];
 	};
 } triangle;
 
