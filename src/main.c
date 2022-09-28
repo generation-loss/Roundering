@@ -26,15 +26,20 @@ SOFTWARE.
 
 #include "pd_api.h"
 #include "geometry.h"
+#include "timer.h"
 
 static int update(void* userdata);
 
-camera cam;
-mesh m;
+pdTimer clearTimer;
+pdTimer rasterizeTimer;
+pdTimer ditherTimer;
+
 int screenWidth;
 int screenHeight;
 int8_t *colorRenderTarget;
 uint16_t *depthRenderTarget;
+camera cam;
+mesh m;
 
 #ifdef _WINDLL
 __declspec(dllexport)
@@ -51,105 +56,109 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 		pd->display->setScale(2);
 		pd->display->setRefreshRate(30.0f);
 		
+		pdTimer_initialize(&clearTimer);
+		pdTimer_initialize(&rasterizeTimer);
+		pdTimer_initialize(&ditherTimer);
+		
 		screenWidth = pd->display->getWidth();
 		screenHeight = pd->display->getHeight();
 		
 		colorRenderTarget = malloc(sizeof(int8_t) * screenWidth * (screenHeight + 2)); //+2 for dithering out-of-bounds room
 		depthRenderTarget = malloc(sizeof(uint16_t) * screenWidth * (screenHeight + 2)); //+2 for dithering out-of-bounds room
 		
-		const fixedInt fieldOfView = toFixedInt(60.0f);
-		const fixedInt aspect = toFixedInt((float)screenWidth / (float)screenHeight);
-		const fixedInt near = toFixedInt(1.0f);
-		const fixedInt far = toFixedInt(20.0f);
+		const float fieldOfView = 60.0f;
+		const float aspect = (float)screenWidth / (float)screenHeight;
+		const float near = 1.0f;
+		const float far = 20.0f;
 		
 		camera_perspective(&cam, fieldOfView, aspect, near, far);
 		
 		m.triangleCount = 12;
 		m.triangles = malloc(sizeof(triangle) * m.triangleCount);
 
-		m.triangles[0].vertices[0] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[0].vertices[1] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[0].vertices[2] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[1].vertices[0] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[1].vertices[1] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[1].vertices[2] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
+		m.triangles[0].vertices[0] 	= (float3){ -1.0f, +1.0f, +1.0f };
+		m.triangles[0].vertices[1] 	= (float3){ +1.0f, +1.0f, +1.0f };
+		m.triangles[0].vertices[2] 	= (float3){ +1.0f, -1.0f, +1.0f };
+		m.triangles[1].vertices[0] 	= (float3){ +1.0f, -1.0f, +1.0f };
+		m.triangles[1].vertices[1] 	= (float3){ -1.0f, -1.0f, +1.0f };
+		m.triangles[1].vertices[2] 	= (float3){ -1.0f, +1.0f, +1.0f };
 	
-		m.triangles[2].vertices[0] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[2].vertices[1] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[2].vertices[2] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[3].vertices[0] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[3].vertices[1] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[3].vertices[2] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
+		m.triangles[2].vertices[0] 	= (float3){ +1.0f, +1.0f, +1.0f };
+		m.triangles[2].vertices[1] 	= (float3){ +1.0f, +1.0f, -1.0f };
+		m.triangles[2].vertices[2] 	= (float3){ +1.0f, -1.0f, -1.0f };
+		m.triangles[3].vertices[0] 	= (float3){ +1.0f, -1.0f, -1.0f };
+		m.triangles[3].vertices[1] 	= (float3){ +1.0f, -1.0f, +1.0f };
+		m.triangles[3].vertices[2] 	= (float3){ +1.0f, +1.0f, +1.0f };
 	
-		m.triangles[4].vertices[0] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[4].vertices[1] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[4].vertices[2] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[5].vertices[0] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[5].vertices[1] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[5].vertices[2] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
+		m.triangles[4].vertices[0] 	= (float3){ +1.0f, +1.0f, -1.0f };
+		m.triangles[4].vertices[1] 	= (float3){ -1.0f, +1.0f, -1.0f };
+		m.triangles[4].vertices[2] 	= (float3){ -1.0f, -1.0f, -1.0f };
+		m.triangles[5].vertices[0] 	= (float3){ -1.0f, -1.0f, -1.0f };
+		m.triangles[5].vertices[1] 	= (float3){ +1.0f, -1.0f, -1.0f };
+		m.triangles[5].vertices[2] 	= (float3){ +1.0f, +1.0f, -1.0f };
 	
-		m.triangles[6].vertices[0] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[6].vertices[1] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[6].vertices[2] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[7].vertices[0] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[7].vertices[1] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[7].vertices[2] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
+		m.triangles[6].vertices[0] 	= (float3){ -1.0f, +1.0f, -1.0f };
+		m.triangles[6].vertices[1] 	= (float3){ -1.0f, +1.0f, +1.0f };
+		m.triangles[6].vertices[2] 	= (float3){ -1.0f, -1.0f, +1.0f };
+		m.triangles[7].vertices[0] 	= (float3){ -1.0f, -1.0f, +1.0f };
+		m.triangles[7].vertices[1] 	= (float3){ -1.0f, -1.0f, -1.0f };
+		m.triangles[7].vertices[2] 	= (float3){ -1.0f, +1.0f, -1.0f };
 	
-		m.triangles[8].vertices[0] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[8].vertices[1] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
-		m.triangles[8].vertices[2] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[9].vertices[0] 	= (fixedInt3){ toFixedInt(+1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[9].vertices[1] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(+1.0f) };
-		m.triangles[9].vertices[2] 	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(+1.0f), toFixedInt(-1.0f) };
+		m.triangles[8].vertices[0] 	= (float3){ -1.0f, +1.0f, -1.0f };
+		m.triangles[8].vertices[1] 	= (float3){ +1.0f, +1.0f, -1.0f };
+		m.triangles[8].vertices[2] 	= (float3){ +1.0f, +1.0f, +1.0f };
+		m.triangles[9].vertices[0] 	= (float3){ +1.0f, +1.0f, +1.0f };
+		m.triangles[9].vertices[1] 	= (float3){ -1.0f, +1.0f, +1.0f };
+		m.triangles[9].vertices[2] 	= (float3){ -1.0f, +1.0f, -1.0f };
 
-		m.triangles[10].vertices[0] = (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[10].vertices[1] = (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
-		m.triangles[10].vertices[2] = (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[11].vertices[0] = (fixedInt3){ toFixedInt(+1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[11].vertices[1] = (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(-1.0f) };
-		m.triangles[11].vertices[2] = (fixedInt3){ toFixedInt(-1.0f), toFixedInt(-1.0f), toFixedInt(+1.0f) };
+		m.triangles[10].vertices[0] = (float3){ -1.0f, -1.0f, +1.0f };
+		m.triangles[10].vertices[1] = (float3){ +1.0f, -1.0f, +1.0f };
+		m.triangles[10].vertices[2] = (float3){ +1.0f, -1.0f, -1.0f };
+		m.triangles[11].vertices[0] = (float3){ +1.0f, -1.0f, -1.0f };
+		m.triangles[11].vertices[1] = (float3){ -1.0f, -1.0f, -1.0f };
+		m.triangles[11].vertices[2] = (float3){ -1.0f, -1.0f, +1.0f };
 
-		m.triangles[0].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
-		m.triangles[0].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
-		m.triangles[0].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
-		m.triangles[1].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
-		m.triangles[1].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
-		m.triangles[1].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(-1.0f) };
+		m.triangles[0].normals[0]  	= (float3){  0.0f,  0.0f, -1.0f };
+		m.triangles[0].normals[1]  	= (float3){  0.0f,  0.0f, -1.0f };
+		m.triangles[0].normals[2]  	= (float3){  0.0f,  0.0f, -1.0f };
+		m.triangles[1].normals[0]  	= (float3){  0.0f,  0.0f, -1.0f };
+		m.triangles[1].normals[1]  	= (float3){  0.0f,  0.0f, -1.0f };
+		m.triangles[1].normals[2]  	= (float3){  0.0f,  0.0f, -1.0f };
  
-		m.triangles[2].normals[0]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[2].normals[1]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[2].normals[2]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[3].normals[0]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[3].normals[1]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[3].normals[2]  	= (fixedInt3){ toFixedInt( 1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
+		m.triangles[2].normals[0]  	= (float3){  1.0f,  0.0f,  0.0f };
+		m.triangles[2].normals[1]  	= (float3){  1.0f,  0.0f,  0.0f };
+		m.triangles[2].normals[2]  	= (float3){  1.0f,  0.0f,  0.0f };
+		m.triangles[3].normals[0]  	= (float3){  1.0f,  0.0f,  0.0f };
+		m.triangles[3].normals[1]  	= (float3){  1.0f,  0.0f,  0.0f };
+		m.triangles[3].normals[2]  	= (float3){  1.0f,  0.0f,  0.0f };
 		
-		m.triangles[4].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
-		m.triangles[4].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
-		m.triangles[4].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
-		m.triangles[5].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
-		m.triangles[5].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
-		m.triangles[5].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(0.0f),  toFixedInt(1.0f) };
+		m.triangles[4].normals[0]  	= (float3){  0.0f,  0.0f,  1.0f };
+		m.triangles[4].normals[1]  	= (float3){  0.0f,  0.0f,  1.0f };
+		m.triangles[4].normals[2]  	= (float3){  0.0f,  0.0f,  1.0f };
+		m.triangles[5].normals[0]  	= (float3){  0.0f,  0.0f,  1.0f };
+		m.triangles[5].normals[1]  	= (float3){  0.0f,  0.0f,  1.0f };
+		m.triangles[5].normals[2]  	= (float3){  0.0f,  0.0f,  1.0f };
 
-		m.triangles[6].normals[0]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[6].normals[1]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[6].normals[2]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[7].normals[0]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[7].normals[1]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
-		m.triangles[7].normals[2]  	= (fixedInt3){ toFixedInt(-1.0f), toFixedInt(0.0f),  toFixedInt(0.0f) };
+		m.triangles[6].normals[0]  	= (float3){ -1.0f,  0.0f,  0.0f };
+		m.triangles[6].normals[1]  	= (float3){ -1.0f,  0.0f,  0.0f };
+		m.triangles[6].normals[2]  	= (float3){ -1.0f,  0.0f,  0.0f };
+		m.triangles[7].normals[0]  	= (float3){ -1.0f,  0.0f,  0.0f };
+		m.triangles[7].normals[1]  	= (float3){ -1.0f,  0.0f,  0.0f };
+		m.triangles[7].normals[2]  	= (float3){ -1.0f,  0.0f,  0.0f };
 
-		m.triangles[8].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
-		m.triangles[8].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
-		m.triangles[8].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
-		m.triangles[9].normals[0]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
-		m.triangles[9].normals[1]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
-		m.triangles[9].normals[2]  	= (fixedInt3){ toFixedInt( 0.0f), toFixedInt(1.0f),  toFixedInt(0.0f) };
+		m.triangles[8].normals[0]  	= (float3){  0.0f,  1.0f,  0.0f };
+		m.triangles[8].normals[1]  	= (float3){  0.0f,  1.0f,  0.0f };
+		m.triangles[8].normals[2]  	= (float3){  0.0f,  1.0f,  0.0f };
+		m.triangles[9].normals[0]  	= (float3){  0.0f,  1.0f,  0.0f };
+		m.triangles[9].normals[1]  	= (float3){  0.0f,  1.0f,  0.0f };
+		m.triangles[9].normals[2]  	= (float3){  0.0f,  1.0f,  0.0f };
  	
-		m.triangles[10].normals[0] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
-		m.triangles[10].normals[1] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
-		m.triangles[10].normals[2] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
-		m.triangles[11].normals[0] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
-		m.triangles[11].normals[1] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
-		m.triangles[11].normals[2] 	= (fixedInt3){ toFixedInt(0.0f), toFixedInt(-1.0f), toFixedInt(0.0f) };
+		m.triangles[10].normals[0] 	= (float3){  0.0f, -1.0f,  0.0f };
+		m.triangles[10].normals[1] 	= (float3){  0.0f, -1.0f,  0.0f };
+		m.triangles[10].normals[2] 	= (float3){  0.0f, -1.0f,  0.0f };
+		m.triangles[11].normals[0] 	= (float3){  0.0f, -1.0f,  0.0f };
+		m.triangles[11].normals[1] 	= (float3){  0.0f, -1.0f,  0.0f };
+		m.triangles[11].normals[2] 	= (float3){  0.0f, -1.0f,  0.0f };
 	}
 	
 	return 0;
@@ -157,13 +166,9 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 
 float rotation = 0.0f;
 
-static fixedInt edgeFunction(const fixedInt2 a, const fixedInt2 b, const fixedInt2 c)
+static float edgeFunction(const float2 a, const float2 b, const float2 c)
 {
-	fixedInt x = fixedInt_subtract(c.x, a.x);
-	fixedInt y = fixedInt_subtract(b.y, a.y);
-	fixedInt z = fixedInt_subtract(c.y, a.y);
-	fixedInt w = fixedInt_subtract(b.x, a.x);
-    return fixedInt_subtract(fixedInt_multiply(x, y), fixedInt_multiply(z, w));
+	return ((c.x - a.x) * (b.y - a.y)) - ((c.y - a.y) * (b.x - a.x));
 }
 
 static int update(void* userdata)
@@ -172,100 +177,92 @@ static int update(void* userdata)
 	
 	rotation += 0.01f;
 
-	fixedInt3 eye 		= { toFixedInt(sinf(rotation) * 5.0f), toFixedInt(5.0f), toFixedInt(cosf(rotation) * 5.0f) };
-	fixedInt3 center 	= { toFixedInt(0.0f), toFixedInt(0.0f), toFixedInt(0.0f) };
-	fixedInt3 up 		= { toFixedInt(0.0f), toFixedInt(1.0f), toFixedInt(0.0f) };
+	float3 eye 		= { sinf(rotation) * 5.0f, 5.0f, cosf(rotation) * 5.0f };
+	float3 center 	= { 0.0f, 0.0f, 0.0f };
+	float3 up 		= { 0.0f, 1.0f, 0.0f };
 	
-	fixedInt3 lightDir = { toFixedInt(sinf(rotation) * 1.0f), toFixedInt(2.0f), toFixedInt(cosf(rotation) * 3.0f) };
-	lightDir = fixedInt3_normalize(lightDir);
+	float3 lightDir = { sinf(rotation) * 1.0f, 2.0f, cosf(rotation) * 3.0f };
+	lightDir = float3_normalize(lightDir);
 	
 	camera_look_at(&cam, eye, center, up);
 	camera_update_view_project(&cam);
 	
-	#if 1
-	float before = pd->system->getElapsedTime();
+	pdTimer_start(&clearTimer, pd);
 	memset(colorRenderTarget, 0, sizeof(int8_t) * screenWidth * screenHeight);
-	float after = pd->system->getElapsedTime() - before;
-	pd->system->logToConsole("Color render target clear: %0.3f milliseconds", after * 1000.0f);
-	#endif
-	#if 1
-	before = pd->system->getElapsedTime();
 	for(int i = 0; i < screenWidth * screenHeight; ++i)
 	{
-		depthRenderTarget[i] = FIXED_INT_SCALE;
+		depthRenderTarget[i] = 65535;
 	}
-	after = pd->system->getElapsedTime() - before;
-	pd->system->logToConsole("Depth render target clear: %0.3f milliseconds", after * 1000.0f);
-	#endif
+	pdTimer_end(&clearTimer, "clear", pd);
 
-#if 1
+	pdTimer_start(&rasterizeTimer, pd);
 	for(uint32_t i = 0; i < m.triangleCount; ++i)
 	{
 		triangle *triangle = &m.triangles[i];
 		
-		fixedInt3 transformed[3];
-		fixedInt2 transformed2[3];
+		float3 transformed[3];
+		float2 transformed2[3];
 		
 		for(uint32_t v = 0; v < 3; ++v)
 		{
-			fixedInt4 vertex4;
+			float4 vertex4;
 			vertex4.x = triangle->vertices[v].x;
 			vertex4.y = triangle->vertices[v].y;
 			vertex4.z = triangle->vertices[v].z;
-			vertex4.w = toFixedInt(1.0f);
+			vertex4.w = 1.0f;
 			
-			fixedInt4 transformed4 = fixedInt4x4_multiply_fixedInt4(cam.viewProject, vertex4);
+			float4 transformed4 = float4x4_multiply_float4(cam.viewProject, vertex4);
 			
-			fixedInt4 transformed3 = fixedInt4_divide_scalar(transformed4, transformed4.w);
+			float4 transformed3 = float4_divide_scalar(transformed4, transformed4.w);
 			
-			transformed[v].x = fixedInt_multiply(fixedInt_add(fixedInt_multiply(transformed3.x, toFixedInt(0.5f)), toFixedInt(0.5f)), toFixedInt(screenWidth));
-			transformed[v].y = fixedInt_multiply(fixedInt_add(fixedInt_multiply(transformed3.y, toFixedInt(0.5f)), toFixedInt(0.5f)), toFixedInt(screenHeight));
+			transformed[v].x = (transformed3.x * 0.5f + 0.5f) * screenWidth;
+			transformed[v].y = (transformed3.y * 0.5f + 0.5f) * screenHeight;
 			transformed[v].z = transformed3.z;
 			
-			transformed2[v] = fixedInt3_xy(transformed[v]);
+			transformed2[v] = float3_xy(transformed[v]);
 		}
 				
 		float ambient = 0.1f;
 		
-		int bbMinX = (int)floorf(toFloat(fixedInt_min(transformed[0].x, fixedInt_min(transformed[1].x, transformed[2].x))));// int_min( (int)(floorf(toFloat(transformed[0].x))), int_min( (int)(floorf(toFloat(transformed[1].x))), (int)(floorf(toFloat(transformed[2].x))) ) );
-		int bbMinY = (int)floorf(toFloat(fixedInt_min(transformed[0].y, fixedInt_min(transformed[1].y, transformed[2].y))));// int_min( (int)(floorf(toFloat(transformed[0].y))), int_min( (int)(floorf(toFloat(transformed[1].y))), (int)(floorf(toFloat(transformed[2].y))) ) );
+		int bbMinX = int_clamp(int_min((int)(floorf(transformed[0].x)), int_min((int)(floorf(transformed[1].x)), (int)(floorf(transformed[2].x)))), 0, screenWidth - 1);
+		int bbMinY = int_clamp(int_min((int)(floorf(transformed[0].y)), int_min((int)(floorf(transformed[1].y)), (int)(floorf(transformed[2].y)))), 0, screenHeight - 1);
 		
-		int bbMaxX = (int)ceilf(toFloat(fixedInt_max(transformed[0].x, fixedInt_max(transformed[1].x, transformed[2].x))));// int_max( (int)(floorf(toFloat(transformed[0].x))), int_max( (int)(floorf(toFloat(transformed[1].x))), (int)(floorf(toFloat(transformed[2].x))) ) );
-		int bbMaxY = (int)ceilf(toFloat(fixedInt_max(transformed[0].y, fixedInt_max(transformed[1].y, transformed[2].y))));// int_max( (int)(floorf(toFloat(transformed[0].y))), int_max( (int)(floorf(toFloat(transformed[1].y))), (int)(floorf(toFloat(transformed[2].y))) ) );
+		int bbMaxX = int_clamp(int_max((int)(ceilf(transformed[0].x)), int_max((int)(ceilf(transformed[1].x)), (int)(ceilf(transformed[2].x)))), 0, screenWidth - 1);
+		int bbMaxY = int_clamp(int_max((int)(ceilf(transformed[0].y)), int_max((int)(ceilf(transformed[1].y)), (int)(ceilf(transformed[2].y)))), 0, screenHeight - 1);
 		
 		for(int y = bbMinY; y <= bbMaxY; ++y)
 		{
 			for(int x = bbMinX; x <= bbMaxX; ++x)
 			{
-				fixedInt2 p;
-				p.x = toFixedInt((float)x);
-				p.y = toFixedInt((float)y);
+				float2 p;
+				p.x = (float)x;
+				p.y = (float)y;
 			
 				//TODO fix inversion
-				fixedInt e0 = -edgeFunction(transformed2[0], transformed2[1], p);
-				fixedInt e1 = -edgeFunction(transformed2[1], transformed2[2], p);
-				fixedInt e2 = -edgeFunction(transformed2[2], transformed2[0], p);
-				
+				float e0 = -edgeFunction(transformed2[0], transformed2[1], p);
+				float e1 = -edgeFunction(transformed2[1], transformed2[2], p);
+				float e2 = -edgeFunction(transformed2[2], transformed2[0], p);
+			
 				if ((e0 >= 0) && (e1 >= 0) && (e2 >= 0))
 				{
 					//barycentrics
-					fixedInt area = -edgeFunction(transformed2[0], transformed2[1], transformed2[2]);
-					e0 = fixedInt_divide(e0, area);
-					e1 = fixedInt_divide(e1, area);
-					e2 = fixedInt_divide(e2, area);
+					float area = -edgeFunction(transformed2[0], transformed2[1], transformed2[2]);
+					e0 = e0 / area;
+					e1 = e1 / area;
+					e2 = e2 / area;
 					
-					//todo scale?
-					uint16_t depth = (uint16_t)((fixedInt_multiply(transformed[0].z, e0)) + (fixedInt_multiply(transformed[1].z, e1)) + (fixedInt_multiply(transformed[2].z, e2)));
+					//todo fix scale?
+					uint16_t depth = (uint16_t)((transformed[0].z * e0 + transformed[1].z * e1 + transformed[2].z + e2) * (1<<12));
 					
 					if (depth < depthRenderTarget[y * screenWidth + x])
 					{
 						depthRenderTarget[y * screenWidth + x] = depth;
 					
 						//SHADE
-						fixedInt3 normal = fixedInt3_add(fixedInt3_multiply_scalar(triangle->n0, e0), fixedInt3_add(fixedInt3_multiply_scalar(triangle->n1, e1), fixedInt3_multiply_scalar(triangle->n2, e2)));
-						normal = fixedInt3_normalize(normal);
+						float3 normal = float3_add(float3_multiply_scalar(triangle->n0, e0), float3_add(float3_multiply_scalar(triangle->n1, e1), float3_multiply_scalar(triangle->n2, e2)));
+						normal = float3_normalize(normal);
 					
-						float nDotL = toFloat(fixedInt_clamp(fixedInt3_dot(normal, lightDir), toFixedInt(0), toFixedInt(1)));
+						float nDotL = float_clamp(float3_dot(normal, lightDir), 0.0f, 1.0f);
 						float lighting = ambient + nDotL;
 						if (lighting > 1.0f)
 						{
@@ -277,12 +274,12 @@ static int update(void* userdata)
 			}
 		}
 	}
-#endif
+	pdTimer_end(&rasterizeTimer, "rasterize", pd);
 	
-	//COPY TO FRAME BUFFER
+	//DITHER TO FRAME BUFFER
 	
 	#if 1
-	before = pd->system->getElapsedTime();
+	pdTimer_start(&ditherTimer, pd);
 	uint8_t *data = pd->graphics->getFrame();
 	
 	for(int y = 0; y < screenHeight; ++y)
@@ -310,8 +307,7 @@ static int update(void* userdata)
 			data[y * LCD_ROWSIZE + x] = byte;
 		}
 	}
-	after = pd->system->getElapsedTime() - before;
-	pd->system->logToConsole("dither: %0.3f milliseconds", after * 1000.0f);
+	pdTimer_end(&ditherTimer, "dither", pd);
 	
 	pd->graphics->markUpdatedRows(0, LCD_ROWS - 1);
 	
