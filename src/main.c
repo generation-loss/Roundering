@@ -171,6 +171,9 @@ static float edgeFunction(const float2 a, const float2 b, const float2 c)
 	return ((c.x - a.x) * (b.y - a.y)) - ((c.y - a.y) * (b.x - a.x));
 }
 
+//#define USE_TIGHT_BOUNDING_BOX (0) //19.974
+#define USE_TIGHT_BOUNDING_BOX (1) //19.814
+
 static int update(void* userdata)
 {
 	PlaydateAPI* pd = userdata;
@@ -224,14 +227,61 @@ static int update(void* userdata)
 				
 		float ambient = 0.1f;
 		
-		int bbMinX = int_clamp(int_min((int)(floorf(transformed[0].x)), int_min((int)(floorf(transformed[1].x)), (int)(floorf(transformed[2].x)))), 0, screenWidth - 1);
-		int bbMinY = int_clamp(int_min((int)(floorf(transformed[0].y)), int_min((int)(floorf(transformed[1].y)), (int)(floorf(transformed[2].y)))), 0, screenHeight - 1);
+		int bbMinY = int_clamp(floorf(float_min(transformed[0].y, float_min(transformed[1].y, transformed[2].y))), 0, screenHeight - 1);
+		int bbMaxY = int_clamp( ceilf(float_max(transformed[0].y, float_max(transformed[1].y, transformed[2].y))), 0, screenHeight - 1);
 		
-		int bbMaxX = int_clamp(int_max((int)(ceilf(transformed[0].x)), int_max((int)(ceilf(transformed[1].x)), (int)(ceilf(transformed[2].x)))), 0, screenWidth - 1);
-		int bbMaxY = int_clamp(int_max((int)(ceilf(transformed[0].y)), int_max((int)(ceilf(transformed[1].y)), (int)(ceilf(transformed[2].y)))), 0, screenHeight - 1);
+	#if !USE_TIGHT_BOUNDING_BOX
+		int bbMinX = int_clamp(floorf(float_min(transformed[0].x, float_min(transformed[1].x, transformed[2].x))), 0, screenWidth - 1);
+		int bbMaxX = int_clamp( ceilf(float_max(transformed[0].x, float_max(transformed[1].x, transformed[2].x))), 0, screenWidth - 1);
+	#else
+		
+		//x = ym + b, as we are solving for x
+		const float m[3] = {
+			 (transformed[1].x - transformed[0].x) / (transformed[1].y - transformed[0].y),
+			 (transformed[2].x - transformed[1].x) / (transformed[2].y - transformed[1].y),
+			 (transformed[0].x - transformed[2].x) / (transformed[0].y - transformed[2].y)
+		};
+		
+		const float b[3] = {
+			transformed[0].x - m[0] * transformed[0].y,
+			transformed[1].x - m[1] * transformed[1].y,
+			transformed[2].x - m[2] * transformed[2].y
+		};
+		
+		const float yMin[3] = {
+			float_min(transformed[0].y, transformed[1].y),
+			float_min(transformed[1].y, transformed[2].y),
+			float_min(transformed[2].y, transformed[0].y)
+		};
+		
+		const float yMax[3] = {
+			float_max(transformed[0].y, transformed[1].y),
+			float_max(transformed[1].y, transformed[2].y),
+			float_max(transformed[2].y, transformed[0].y)
+		};
+	
+	#endif
 		
 		for(int y = bbMinY; y <= bbMaxY; ++y)
 		{
+		#if USE_TIGHT_BOUNDING_BOX
+			const float x[3] = {
+				(float)y * m[0] + b[0],
+				(float)y * m[1] + b[1],
+				(float)y * m[2] + b[2]
+			};
+			
+			//make sure y is in range
+			const bool valid[3] = {
+				(y >= yMin[0]) && (y <= yMax[0]),
+				(y >= yMin[1]) && (y <= yMax[1]),
+				(y >= yMin[2]) && (y <= yMax[2])
+			};
+			
+			const int bbMinX = int_clamp((int)floorf(float_min(valid[0] ? x[0] : +10000000.0f, float_min(valid[1] ? x[1] : +10000000.0f, valid[2] ? x[2] : +10000000.0f))), 0, screenWidth - 1);
+			const int bbMaxX = int_clamp((int) ceilf(float_max(valid[0] ? x[0] : +10000000.0f, float_max(valid[1] ? x[1] : +10000000.0f, valid[2] ? x[2] : +10000000.0f))), 0, screenWidth - 1);
+		#endif
+			
 			for(int x = bbMinX; x <= bbMaxX; ++x)
 			{
 				float2 p;
@@ -246,7 +296,7 @@ static int update(void* userdata)
 				if ((e0 >= 0) && (e1 >= 0) && (e2 >= 0))
 				{
 					//barycentrics
-					float area = -edgeFunction(transformed2[0], transformed2[1], transformed2[2]);
+					const float area = -edgeFunction(transformed2[0], transformed2[1], transformed2[2]);
 					e0 = e0 / area;
 					e1 = e1 / area;
 					e2 = e2 / area;
