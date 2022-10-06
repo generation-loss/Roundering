@@ -25,35 +25,58 @@ SOFTWARE.
 
 #include "math.h"
 
+#define USE_INDEXED_GEOMETRY (1)
+
+typedef struct vertex
+{
+	float3 v;
+	float3 n;
+} vertex;
+
+#if !USE_INDEXED_GEOMETRY
 typedef struct triangle
 {
 	union
 	{
 		struct
 		{
-			float3 v0;
-			float3 v1;
-			float3 v2;
+			vertex v0;
+			vertex v1;
+			vertex v2;
 		};
-		float3 vertices[3];
-	};
-	union
-	{
-		struct
-		{
-			float3 n0;
-			float3 n1;
-			float3 n2;
-		};
-		float3 normals[3];
+		vertex vertices[3];
 	};
 } triangle;
+#endif
 
 typedef struct mesh
 {
+#if USE_INDEXED_GEOMETRY
+	uint32_t indexCount;
+	uint32_t* indices;
+	uint32_t vertexCount;
+	vertex* vertices;
+#else
 	uint32_t triangleCount;
 	triangle* triangles;
+#endif
 } mesh;
+
+#if USE_INDEXED_GEOMETRY
+static inline void mesh_init(mesh* m, uint32_t indexCount, uint32_t vertexCount)
+{
+	m->indexCount = indexCount;
+	m->indices = malloc(sizeof(uint32_t) * indexCount);
+	m->vertexCount = vertexCount;
+	m->vertices = malloc(sizeof(vertex) * vertexCount);
+}
+#else
+static inline void mesh_init(mesh* m, uint32_t triangleCount)
+{
+	m->triangleCount = triangleCount;
+	m->triangles = malloc(sizeof(triangle) * triangleCount);
+}
+#endif
 
 #endif /* __ROUNDERING_GEOMETRY_H__ */
 
