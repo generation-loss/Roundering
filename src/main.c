@@ -26,6 +26,7 @@ SOFTWARE.
 
 #include "pd_api.h"
 #include "geometry.h"
+#include "obj.h"
 #include "timer.h"
 
 static int update(void* userdata);
@@ -73,6 +74,9 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 		
 		camera_perspective(&cam, fieldOfView, aspect, near, far);
 		
+	#if 1
+		obj_load("teapot.obj", &m, pd);
+	#else
 	#if USE_INDEXED_GEOMETRY
 		mesh_init(&m, 36, 24);
 	
@@ -233,6 +237,7 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 		m.triangles[11].vertices[0].n 	= (float3){  0.0f, -1.0f,  0.0f };
 		m.triangles[11].vertices[1].n 	= (float3){  0.0f, -1.0f,  0.0f };
 		m.triangles[11].vertices[2].n 	= (float3){  0.0f, -1.0f,  0.0f };
+	#endif
 	#endif
 	}
 	

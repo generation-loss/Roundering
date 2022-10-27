@@ -52,7 +52,7 @@ static inline void pdTimer_end(pdTimer *timer, const char* name, PlaydateAPI* pd
 	timer->total += pd->system->getElapsedTime() - timer->start;
 	timer->count++;
 	timer->running = false;
-	pd->system->logToConsole("PDTimer %s: %0.3f milliseconds", name, (timer->total / timer->count) * 1000.0f);
+	//pd->system->logToConsole("PDTimer %s: %0.3f milliseconds", name, (timer->total / timer->count) * 1000.0f);
 }
 
 #endif /* __ROUNDERING_TIMER_H__ */
