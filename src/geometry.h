@@ -80,6 +80,29 @@ static inline void mesh_init(mesh* m, uint32_t triangleCount)
 }
 #endif
 
+static inline void mesh_generateNormals(mesh* m)
+{
+#if USE_INDEXED_GEOMETRY
+	for(uint32_t i = 0; i < m->indexCount; i += 3)
+	{
+		vertex *v0 = &m->vertices[m->indices[i + 0]];
+		vertex *v1 = &m->vertices[m->indices[i + 1]];
+		vertex *v2 = &m->vertices[m->indices[i + 2]];
+#else
+	for(uint32_t t = 0; t < m->triangleCount; ++t)
+	{
+		vertex *v0 = &m->triangles[t].v0;
+		vertex *v1 = &m->triangles[t].v1;
+		vertex *v2 = &m->triangles[t].v2;
+#endif
+
+		float3 n = float3_cross(float3_subtract(v2->v, v0->v), float3_subtract(v1->v, v0->v));
+		v0->n = n;
+		v1->n = n;
+		v2->n = n;
+	}
+}
+
 #endif /* __ROUNDERING_GEOMETRY_H__ */
 
 

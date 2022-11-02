@@ -29,6 +29,11 @@ SOFTWARE.
 #include "obj.h"
 #include "timer.h"
 
+#define USE_TIGHT_BOUNDING_BOX (0) 			//19.974
+//#define USE_TIGHT_BOUNDING_BOX (1) 		//19.814
+
+#define USE_VERTEX_CACHE (0)
+
 static int update(void* userdata);
 
 pdTimer clearTimer;
@@ -75,7 +80,8 @@ int eventHandler(PlaydateAPI* pd, PDSystemEvent event, uint32_t arg)
 		camera_perspective(&cam, fieldOfView, aspect, near, far);
 		
 	#if 1
-		obj_load("teapot.obj", &m, pd);
+		obj_load("teapot2.txt", &m, pd);
+		mesh_generateNormals(&m);
 	#else
 	#if USE_INDEXED_GEOMETRY
 		mesh_init(&m, 36, 24);
@@ -251,9 +257,6 @@ static inline float edgeFunction(const float2 a, const float2 b, const float2 c)
 	return ((c.x - a.x) * (b.y - a.y)) - ((c.y - a.y) * (b.x - a.x));
 }
 
-//#define USE_TIGHT_BOUNDING_BOX (0) 	//19.974
-#define USE_TIGHT_BOUNDING_BOX (1) 		//19.814
-
 static int update(void* userdata)
 {
 	PlaydateAPI* pd = userdata;
@@ -281,10 +284,13 @@ static int update(void* userdata)
 	pdTimer_start(&rasterizeTimer, pd);
 	
 #if USE_INDEXED_GEOMETRY
+
+#if USE_VERTEX_CACHE
 	bool* cached = malloc(sizeof(bool) * m.vertexCount);
 	memset(cached, 0, sizeof(bool) * m.vertexCount);
 	float3* transformCache = malloc(sizeof(float3) * m.vertexCount);
 	float2* transform2Cache = malloc(sizeof(float2) * m.vertexCount);
+#endif
 	
 	for(uint32_t i = 0; i < m.indexCount; i += 3)
 #else
@@ -298,12 +304,14 @@ static int update(void* userdata)
 		for(uint32_t v = 0; v < 3; ++v)
 		{
 			const uint32_t index = m.indices[i+v];
+		#if USE_VERTEX_CACHE
 			if (cached[index])
 			{
 				transformed[v] = transformCache[index];
 				transformed2[v] = transform2Cache[index];
 			}
 			else
+		#endif
 			{
 				float4 vertex4;
 				vertex4.x = m.vertices[index].v.x;
@@ -320,10 +328,11 @@ static int update(void* userdata)
 				transformed[v].z = transformed3.z;
 				
 				transformed2[v] = float3_xy(transformed[v]);
-				
+			#if USE_VERTEX_CACHE
 				transformCache[index] = transformed[v];
 				transform2Cache[index] = transformed2[v];
 				cached[index] = true;
+			#endif
 			}
 		}
 #else
@@ -451,7 +460,7 @@ static int update(void* userdata)
 			}
 		}
 	}
-#if USE_INDEXED_GEOMETRY
+#if USE_INDEXED_GEOMETRY && USE_VERTEX_CACHE
 	free(cached);
 	free(transformCache);
 	free(transform2Cache);
